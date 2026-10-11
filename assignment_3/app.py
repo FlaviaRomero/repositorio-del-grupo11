@@ -57,3 +57,12 @@ st.caption(
 if filtrado.empty:
     st.warning("No hay departamentos que cumplan los filtros. Ajusta la selección.")
     st.stop()
+
+# ---------------------------------------------------------------------- metricas
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Departamentos", f"{len(filtrado):,}")
+c2.metric("Declaratorias", f"{int(filtrado['declaratorias'].sum()):,}")
+c3.metric("Prórrogas", f"{int(filtrado['prorrogas'].sum()):,}")
+c4.metric("Lluvia promedio (mm)", f"{filtrado['lluvia_total_mm'].mean():,.1f}")
+
+st.divider()
