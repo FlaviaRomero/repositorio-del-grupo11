@@ -4,9 +4,11 @@ Correr en local (desde la carpeta assignment_3/):
     uv run streamlit run app.py
 """
 
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 # ---------------------------------------------------------------- configuracion
@@ -33,7 +35,13 @@ datos = cargar()
 # ----------------------------------------------------------------------- filtros
 st.sidebar.header("Filtros")
 
-departamentos = sorted(datos["departamento"].unique())
+
+def sin_tildes(texto):
+    # Para ordenar: sorted() a secas manda "Áncash" al final de la lista
+    return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+
+
+departamentos = sorted(datos["departamento"].unique(), key=sin_tildes)
 elegidos = st.sidebar.multiselect(
     "Departamento", departamentos, default=departamentos
 )
@@ -66,3 +74,77 @@ c3.metric("Prórrogas", f"{int(filtrado['prorrogas'].sum()):,}")
 c4.metric("Lluvia promedio (mm)", f"{filtrado['lluvia_total_mm'].mean():,.1f}")
 
 st.divider()
+
+# ---------------------------------------------------------------------- graficos
+izq, der = st.columns(2)
+
+# Misma altura para los dos graficos; crece con el numero de departamentos
+alto = max(350, 24 * len(filtrado))
+
+with izq:
+    st.subheader("Decretos por departamento")
+    por_depto = (
+        filtrado.sort_values("total_decretos")
+        .rename(columns={"declaratorias": "Declaratorias", "prorrogas": "Prórrogas"})
+    )
+    fig = px.bar(
+        por_depto, x=["Declaratorias", "Prórrogas"], y="departamento", orientation="h",
+        color_discrete_map={"Declaratorias": "#a50f15", "Prórrogas": "#fc9272"},
+        labels={"value": "Decretos", "departamento": "", "variable": ""},
+    )
+    fig.update_layout(
+        template="plotly_white", height=alto,
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
+    )
+    st.plotly_chart(fig, width="stretch")
+
+with der:
+    st.subheader("¿Más lluvia, más declaratorias?")
+    fig = px.scatter(
+        filtrado, x="lluvia_total_mm", y="declaratorias",
+        hover_name="departamento",
+        hover_data={"capital": True, "prorrogas": True, "dias_lluvia_fuerte": True},
+        labels={
+            "lluvia_total_mm": "Lluvia acumulada ene-may 2024 (mm)",
+            "declaratorias": "Declaratorias",
+            "prorrogas": "Prórrogas",
+            "capital": "Capital",
+            "dias_lluvia_fuerte": "Días con 20 mm o más",
+        },
+    )
+    fig.update_traces(marker=dict(size=11, color="#a50f15", line=dict(width=1.5, color="white")))
+    fig.update_layout(template="plotly_white", height=alto)
+    st.plotly_chart(fig, width="stretch")
+
+# -------------------------------------------------------------------------- mapa
+st.subheader("Mapa por capital de departamento")
+st.caption("Tamaño del punto: lluvia acumulada · Color: número de declaratorias")
+
+fig = px.scatter_map(
+    filtrado,
+    lat="latitud",
+    lon="longitud",
+    color="declaratorias",
+    size="lluvia_total_mm",
+    color_continuous_scale="YlOrRd",
+    # Escala de color fija: un departamento no cambia de color al filtrar
+    range_color=[0, datos["declaratorias"].max()],
+    size_max=30,
+    map_style="carto-positron",
+    zoom=4.3,
+    center={"lat": -9.2, "lon": -75.0},
+    hover_name="departamento",
+    hover_data={
+        "capital": True, "declaratorias": True, "prorrogas": True,
+        "lluvia_total_mm": True, "latitud": False, "longitud": False,
+    },
+    labels={
+        "declaratorias": "Declaratorias", "prorrogas": "Prórrogas",
+        "lluvia_total_mm": "Lluvia (mm)", "capital": "Capital",
+    },
+    height=550,
+)
+# Tamano fijo respecto a todo el dataset (no solo al filtro) y minimo visible
+fig.update_traces(marker=dict(sizeref=2 * datos["lluvia_total_mm"].max() / 30**2, sizemin=5))
+fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+st.plotly_chart(fig, width="stretch")
