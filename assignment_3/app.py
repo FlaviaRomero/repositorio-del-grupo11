@@ -148,3 +148,30 @@ fig = px.scatter_map(
 fig.update_traces(marker=dict(sizeref=2 * datos["lluvia_total_mm"].max() / 30**2, sizemin=5))
 fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
 st.plotly_chart(fig, width="stretch")
+
+# ------------------------------------------------------------------------- tabla
+st.subheader("Datos por departamento")
+
+tabla = filtrado.sort_values(["total_decretos", "lluvia_total_mm"], ascending=False)[
+    ["ubigeo", "departamento", "capital", "declaratorias", "prorrogas",
+     "total_decretos", "lluvia_total_mm", "dias_lluvia_fuerte"]
+]
+
+st.dataframe(
+    tabla.rename(columns={
+        "ubigeo": "Ubigeo", "departamento": "Departamento", "capital": "Capital",
+        "declaratorias": "Declaratorias", "prorrogas": "Prórrogas",
+        "total_decretos": "Total decretos", "lluvia_total_mm": "Lluvia (mm)",
+        "dias_lluvia_fuerte": "Días con 20 mm o más",
+    }),
+    width="stretch",
+    hide_index=True,
+)
+st.caption("1 mm de lluvia equivale a 1 litro de agua por metro cuadrado.")
+
+st.download_button(
+    "Descargar datos filtrados (CSV)",
+    tabla.to_csv(index=False).encode("utf-8-sig"),
+    "lluvias_emergencias_filtrado.csv",
+    "text/csv",
+)
